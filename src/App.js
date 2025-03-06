@@ -109,18 +109,18 @@ function App() {
     
     if (visaData) {
       setFormData({
-        visa_type: visaData.visa_type,
-        description: visaData.description,
+        visa_type: visaData.visa_type || '',
+        description: visaData.description || '',
         eligible_applicants: Array.isArray(visaData.eligible_applicants) 
           ? visaData.eligible_applicants.join(', ') 
-          : visaData.eligible_applicants,
-        duration: visaData.duration,
+          : (typeof visaData.eligible_applicants === 'string' ? visaData.eligible_applicants : ''),
+        duration: visaData.duration || '',
         exempted_countries: Array.isArray(visaData.exempted_countries) 
           ? visaData.exempted_countries.join(', ') 
-          : visaData.exempted_countries,
+          : (typeof visaData.exempted_countries === 'string' ? visaData.exempted_countries : ''),
         restricted_countries: Array.isArray(visaData.restricted_countries) 
           ? visaData.restricted_countries.join(', ') 
-          : visaData.restricted_countries
+          : (typeof visaData.restricted_countries === 'string' ? visaData.restricted_countries : '')
       });
     }
   };
@@ -190,14 +190,17 @@ function App() {
       // Format arrays from comma-separated strings
       const formattedData = {
         ...formData,
-        eligible_applicants: formData.eligible_applicants.split(',').map(item => item.trim())
-          .filter(item => item !== ''),
-        exempted_countries: formData.exempted_countries.split(',').map(item => item.trim())
-          .filter(item => item !== ''),
-        restricted_countries: formData.restricted_countries.split(',').map(item => item.trim())
-          .filter(item => item !== '')
+        eligible_applicants: typeof formData.eligible_applicants === 'string' 
+          ? formData.eligible_applicants.split(',').map(item => item.trim()).filter(item => item !== '')
+          : formData.eligible_applicants,
+        exempted_countries: typeof formData.exempted_countries === 'string'
+          ? formData.exempted_countries.split(',').map(item => item.trim()).filter(item => item !== '')
+          : formData.exempted_countries,
+        restricted_countries: typeof formData.restricted_countries === 'string'
+          ? formData.restricted_countries.split(',').map(item => item.trim()).filter(item => item !== '')
+          : formData.restricted_countries
       };
-
+  
       if (modalMode === 'add') {
         await apiService.createVisa(selectedCountry, formattedData);
         showAlert('success', `Successfully added ${formData.visa_type}`);
@@ -205,7 +208,7 @@ function App() {
         await apiService.updateVisa(selectedCountry, selectedVisa, formattedData);
         showAlert('success', `Successfully updated ${formData.visa_type}`);
       }
-
+  
       // Refresh visa types after adding or updating
       fetchVisaTypes(selectedCountry);
       setShowVisaModal(false);
@@ -219,6 +222,7 @@ function App() {
       setLoading(prev => ({ ...prev, operations: false }));
     }
   };
+  
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

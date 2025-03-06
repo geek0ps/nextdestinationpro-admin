@@ -1,8 +1,9 @@
-// src/services/api.js - Complete implementation for Lambda integration
+// src/services/api.js - Updated for Lambda integration
 import axios from 'axios';
 
 // API endpoint from environment variable or hardcoded value
-const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'https://your-api-gateway-endpoint.amazonaws.com/dev';
+// Replace 'your-api-id' and 'region' with your actual API Gateway ID and region
+const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'https://80wr5reg3m.execute-api.eu-west-1.amazonaws.com/prod';
 
 // Create axios instance with common configuration
 const apiClient = axios.create({
@@ -73,9 +74,6 @@ const handleApiError = (error, customMessage) => {
   // Log error for debugging
   console.error(`${customMessage}: ${errorMessage}`, error);
   
-  // You could implement additional error logging here
-  // logToService(error, customMessage);
-  
   // Rethrow the error with additional info
   throw error;
 };
@@ -87,12 +85,12 @@ const apiService = {
     try {
       const response = await apiClient.get('/countries');
       
-      // Validate response structure
-      if (!response.data || !Array.isArray(response.data.countries)) {
+      // The Lambda function returns the countries as a direct array
+      if (!response.data || !Array.isArray(response.data)) {
         throw new Error('Invalid response format from countries API');
       }
       
-      return response.data.countries;
+      return response.data;
     } catch (error) {
       handleApiError(error, 'Error fetching countries');
     }
@@ -107,12 +105,15 @@ const apiService = {
     try {
       const response = await apiClient.get(`/visas/${encodeURIComponent(country)}`);
       
-      // Validate response structure
-      if (!response.data || !Array.isArray(response.data.visa_types)) {
+      // The Lambda function returns visa types as a direct array
+      if (!response.data) {
         throw new Error('Invalid response format from visa types API');
       }
       
-      return response.data.visa_types;
+      // Format the response if needed
+      const formattedVisa = Array.isArray(response.data) ? response.data : [response.data];
+      
+      return formattedVisa;
     } catch (error) {
       handleApiError(error, `Error fetching visa types for ${country}`);
     }
@@ -144,10 +145,17 @@ const apiService = {
     }
     
     try {
-      const response = await apiClient.put(
-        `/visas/${encodeURIComponent(country)}/${encodeURIComponent(visaType)}`,
-        visaData
-      );
+      // Log the visa type before encoding for debugging
+      console.log('Updating visa type:', visaType);
+      
+      // Make sure you're not double-encoding if the URL already contains %20
+      const encodedVisaType = visaType.includes('%') ? visaType : encodeURIComponent(visaType);
+      const encodedCountry = encodeURIComponent(country);
+      
+      const url = `/visas/${encodedCountry}/${encodedVisaType}`;
+      console.log('Request URL:', url);
+      
+      const response = await apiClient.put(url, visaData);
       return response.data;
     } catch (error) {
       handleApiError(error, `Error updating visa ${visaType} for ${country}`);
