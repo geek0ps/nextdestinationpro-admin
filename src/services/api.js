@@ -1,4 +1,4 @@
-// src/services/api.js - Updated for Lambda integration
+// src/services/api.js - Updated for Lambda integration with Experts API
 import axios from 'axios';
 
 // API endpoint from environment variable or hardcoded value
@@ -80,6 +80,8 @@ const handleApiError = (error, customMessage) => {
 
 // API service with proper error handling and response parsing
 const apiService = {
+  // VISA INFORMATION ENDPOINTS
+
   // Get all countries
   getCountries: async () => {
     try {
@@ -116,6 +118,27 @@ const apiService = {
       return formattedVisa;
     } catch (error) {
       handleApiError(error, `Error fetching visa types for ${country}`);
+    }
+  },
+
+  // Get a specific visa type for a country
+  getVisaDetails: async (country, visaType) => {
+    if (!country || !visaType) {
+      throw new Error('Country and visa type parameters are required');
+    }
+    
+    try {
+      const response = await apiClient.get(
+        `/visas/${encodeURIComponent(country)}/${encodeURIComponent(visaType)}`
+      );
+      
+      if (!response.data) {
+        throw new Error('Invalid response format from visa details API');
+      }
+      
+      return response.data;
+    } catch (error) {
+      handleApiError(error, `Error fetching details for visa ${visaType} in ${country}`);
     }
   },
 
@@ -175,6 +198,179 @@ const apiService = {
       return response.data;
     } catch (error) {
       handleApiError(error, `Error deleting visa ${visaType} for ${country}`);
+    }
+  },
+
+  // VISA EXPERTS ENDPOINTS
+
+  // Get all experts with optional filtering
+  getAllExperts: async (filters = {}) => {
+    try {
+      // Build query string from filters
+      const params = new URLSearchParams();
+      
+      if (filters.country) params.append('country', filters.country);
+      if (filters.visaType) params.append('visaType', filters.visaType);
+      if (filters.language) params.append('language', filters.language);
+      if (filters.minRating) params.append('minRating', filters.minRating);
+      
+      const queryString = params.toString();
+      const url = `/experts${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await apiClient.get(url);
+      
+      if (!response.data || !response.data.experts) {
+        throw new Error('Invalid response format from experts API');
+      }
+      
+      return response.data.experts;
+    } catch (error) {
+      handleApiError(error, 'Error fetching experts');
+      return []; // Return empty array on error to prevent UI errors
+    }
+  },
+
+  // Get an expert by ID
+  getExpertById: async (expertId) => {
+    if (!expertId) {
+      throw new Error('Expert ID is required');
+    }
+    
+    try {
+      const response = await apiClient.get(`/experts/${expertId}`);
+      
+      if (!response.data) {
+        throw new Error('Invalid response format from expert details API');
+      }
+      
+      return response.data;
+    } catch (error) {
+      handleApiError(error, `Error fetching expert with ID ${expertId}`);
+    }
+  },
+
+  // Create a new expert
+  createExpert: async (expertData) => {
+    if (!expertData) {
+      throw new Error('Expert data is required');
+    }
+    
+    // Convert float values to strings to avoid DynamoDB float type issues
+    const preparedData = {
+      ...expertData,
+      rating: typeof expertData.rating === 'number' ? String(expertData.rating) : expertData.rating,
+      reviewCount: typeof expertData.reviewCount === 'number' ? String(expertData.reviewCount) : expertData.reviewCount,
+      successRate: typeof expertData.successRate === 'number' ? String(expertData.successRate) : expertData.successRate,
+      yearsExperience: typeof expertData.yearsExperience === 'number' ? String(expertData.yearsExperience) : expertData.yearsExperience
+    };
+    
+    try {
+      const response = await apiClient.post('/experts', preparedData);
+      return response.data;
+    } catch (error) {
+      handleApiError(error, 'Error creating expert');
+    }
+  },
+
+  // Update an existing expert
+  // Update an existing expert
+updateExpert: async (expertId, expertData) => {
+  if (!expertId || !expertData) {
+    throw new Error('Expert ID and expert data are required');
+  }
+  
+  // Convert float values to strings to avoid DynamoDB float type issues
+  const preparedData = {
+    ...expertData,
+    rating: typeof expertData.rating === 'number' ? String(expertData.rating) : expertData.rating,
+    reviewCount: typeof expertData.reviewCount === 'number' ? String(expertData.reviewCount) : expertData.reviewCount,
+    successRate: typeof expertData.successRate === 'number' ? String(expertData.successRate) : expertData.successRate,
+    yearsExperience: typeof expertData.yearsExperience === 'number' ? String(expertData.yearsExperience) : expertData.yearsExperience
+  };
+  
+  try {
+    const response = await apiClient.put(`/experts/${expertId}`, preparedData);
+    return response.data;
+  } catch (error) {
+    handleApiError(error, `Error updating expert with ID ${expertId}`);
+  }
+},
+  // Delete an expert
+  deleteExpert: async (expertId) => {
+    if (!expertId) {
+      throw new Error('Expert ID is required');
+    }
+    
+    try {
+      const response = await apiClient.delete(`/experts/${expertId}`);
+      return response.data;
+    } catch (error) {
+      handleApiError(error, `Error deleting expert with ID ${expertId}`);
+    }
+  },
+
+  // Get experts for a specific country
+  getExpertsByCountry: async (country) => {
+    if (!country) {
+      throw new Error('Country parameter is required');
+    }
+    
+    try {
+      const response = await apiClient.get(`/experts/countries/${encodeURIComponent(country)}`);
+      
+      if (!response.data || !response.data.experts) {
+        throw new Error('Invalid response format from experts by country API');
+      }
+      
+      return response.data.experts;
+    } catch (error) {
+      handleApiError(error, `Error fetching experts for country ${country}`);
+      return []; // Return empty array on error to prevent UI errors
+    }
+  },
+
+  // Get experts for a specific visa type
+  getExpertsByVisaType: async (visaType) => {
+    if (!visaType) {
+      throw new Error('Visa type parameter is required');
+    }
+    
+    try {
+      const response = await apiClient.get(`/experts/visa-types/${encodeURIComponent(visaType)}`);
+      
+      if (!response.data || !response.data.experts) {
+        throw new Error('Invalid response format from experts by visa type API');
+      }
+      
+      return response.data.experts;
+    } catch (error) {
+      handleApiError(error, `Error fetching experts for visa type ${visaType}`);
+      return []; // Return empty array on error to prevent UI errors
+    }
+  },
+
+  // Get experts for a specific country and visa type combination
+  getExpertsByCountryAndVisa: async (country, visaType) => {
+    if (!country || !visaType) {
+      throw new Error('Country and visa type parameters are required');
+    }
+    
+    try {
+      const encodedCountry = encodeURIComponent(country);
+      const encodedVisaType = encodeURIComponent(visaType);
+      
+      const response = await apiClient.get(
+        `/experts/country-visa/${encodedCountry}/${encodedVisaType}`
+      );
+      
+      if (!response.data || !response.data.experts) {
+        throw new Error('Invalid response format from experts by country and visa type API');
+      }
+      
+      return response.data.experts;
+    } catch (error) {
+      handleApiError(error, `Error fetching experts for ${visaType} in ${country}`);
+      return []; // Return empty array on error to prevent UI errors
     }
   },
 
@@ -262,6 +458,110 @@ const apiService = {
         }
       ];
     }
+  },
+
+  // Mock data for visa experts
+  getMockExperts: (country, visaType) => {
+    const mockExperts = [
+      {
+        id: "1",
+        name: "Dr. Sarah Johnson",
+        photo: "/api/placeholder/150/150",
+        title: "Global Immigration Specialist",
+        yearsExperience: 15,
+        languages: ["English", "French", "Spanish"],
+        rating: 4.9,
+        reviewCount: 147,
+        bio: "Former immigration official with extensive knowledge of North American visa processes.",
+        specialization: {
+          countries: ["United States", "Canada", "Australia"],
+          visaTypes: [
+            {
+              country: "United States",
+              types: ["H-1B", "L-1", "O-1", "EB-5"]
+            },
+            {
+              country: "Canada",
+              types: ["Express Entry", "Provincial Nominee", "Start-up Visa"]
+            }
+          ]
+        },
+        successRate: 97,
+        consultationFee: "$150",
+        availability: "Within 48 hours",
+        verified: true
+      },
+      {
+        id: "2",
+        name: "James Wilson",
+        photo: "/api/placeholder/150/150",
+        title: "Canadian Immigration Expert",
+        yearsExperience: 12,
+        languages: ["English", "French"],
+        rating: 4.8,
+        reviewCount: 124,
+        bio: "Former Canadian immigration officer with extensive knowledge of all Canadian immigration pathways.",
+        specialization: {
+          countries: ["Canada"],
+          visaTypes: [
+            {
+              country: "Canada",
+              types: ["Express Entry", "Provincial Nominee", "Family Class", "Study Permits"]
+            }
+          ]
+        },
+        successRate: 94,
+        consultationFee: "$120",
+        availability: "Same day",
+        verified: true
+      },
+      {
+        id: "3",
+        name: "Elena Rodriguez",
+        photo: "/api/placeholder/150/150",
+        title: "US Immigration Attorney",
+        yearsExperience: 10,
+        languages: ["English", "Spanish"],
+        rating: 4.7,
+        reviewCount: 98,
+        bio: "Specialized in employment-based and family-based immigration to the United States.",
+        specialization: {
+          countries: ["United States"],
+          visaTypes: [
+            {
+              country: "United States",
+              types: ["Family-Based Green Cards", "H-1B", "L-1", "E-2", "K-1 Fiancé"]
+            }
+          ]
+        },
+        successRate: 95,
+        consultationFee: "$135",
+        availability: "Within 24 hours",
+        verified: true
+      }
+    ];
+    
+    // Filter by country and visa type if provided
+    let filteredExperts = mockExperts;
+    
+    if (country) {
+      filteredExperts = filteredExperts.filter(expert => 
+        expert.specialization.countries.includes(country)
+      );
+    }
+    
+    if (visaType) {
+      filteredExperts = filteredExperts.filter(expert => {
+        // Check if expert handles this visa type for the specific country
+        const countryVisaTypes = expert.specialization.visaTypes.find(vt => 
+          vt.country === country
+        );
+        
+        return countryVisaTypes && countryVisaTypes.types.includes(visaType);
+      });
+    }
+    
+    return filteredExperts;
   }
 };
 

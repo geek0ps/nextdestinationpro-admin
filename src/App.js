@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   Container, Row, Col, Card, Table, Button, Form, Modal, Alert,
-  Navbar, Nav, Dropdown, ListGroup, Badge, Spinner
+  Navbar, Nav, Dropdown, ListGroup, Badge, Spinner, Tabs, Tab
 } from 'react-bootstrap';
 import './NextDestinationAdmin.css';
 import apiService from './services/api';
 import logo from './logo.svg'; // Make sure to have this file in your assets folder
+import SpecialistsManagement from './SpecialistsManagement';
 
 function App() {
+  // State for active tab
+  const [activeTab, setActiveTab] = useState('visas'); // 'visas' or 'specialists'
+  
   // State for countries and selection
   const [countries, setCountries] = useState([]);
   const [selectedCountry, setSelectedCountry] = useState(null);
@@ -303,8 +307,19 @@ function App() {
             <Nav.Link href="#dashboard">
               <i className="bi bi-speedometer2 me-2"></i> Dashboard
             </Nav.Link>
-            <Nav.Link href="#visas" className="active">
+            <Nav.Link
+              href="#visas"
+              active={activeTab === 'visas'}
+              onClick={() => setActiveTab('visas')}
+            >
               <i className="bi bi-file-earmark-text me-2"></i> Visa Management
+            </Nav.Link>
+            <Nav.Link
+              href="#specialists"
+              active={activeTab === 'specialists'}
+              onClick={() => setActiveTab('specialists')}
+            >
+              <i className="bi bi-people me-2"></i> Specialists
             </Nav.Link>
             <Nav.Link href="#countries">
               <i className="bi bi-globe me-2"></i> Countries
@@ -336,232 +351,254 @@ function App() {
             <Row className="mb-3">
               <Col>
                 <div className="page-header">
-                  <h3>Visa Management</h3>
-                  <p className="text-muted">Manage visa types, requirements, and country-specific information</p>
+                  <h3>{activeTab === 'visas' ? 'Visa Management' : 'Specialist Management'}</h3>
+                  <p className="text-muted">
+                    {activeTab === 'visas' 
+                      ? 'Manage visa types, requirements, and country-specific information' 
+                      : 'Manage visa specialists, their expertise, and country specializations'}
+                  </p>
                 </div>
               </Col>
             </Row>
             
-            <Row>
-              <Col md={3} lg={3} xl={2} className="mb-4">
-                <Card className="ndp-card">
-                  <Card.Header className="d-flex justify-content-between align-items-center">
-                    <h5 className="mb-0">Countries</h5>
-                    {!loading.countries && (
-                      <Badge bg="primary" pill>{filteredCountries.length}</Badge>
-                    )}
-                  </Card.Header>
-                  <Card.Body className="p-0">
-                    <div className="search-box p-2">
-                      <Form.Control
-                        type="text"
-                        placeholder="Search countries..."
-                        className="search-input"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                    <div className="country-list">
-                      {loading.countries ? (
+            {activeTab === 'visas' ? (
+              <Row>
+                <Col md={3} lg={3} xl={2} className="mb-4">
+                  <Card className="ndp-card">
+                    <Card.Header className="d-flex justify-content-between align-items-center">
+                      <h5 className="mb-0">Countries</h5>
+                      {!loading.countries && (
+                        <Badge bg="primary" pill>{filteredCountries.length}</Badge>
+                      )}
+                    </Card.Header>
+                    <Card.Body className="p-0">
+                      <div className="search-box p-2">
+                        <Form.Control
+                          type="text"
+                          placeholder="Search countries..."
+                          className="search-input"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      <div className="country-list">
+                        {loading.countries ? (
+                          <div className="text-center py-5">
+                            <Spinner animation="border" variant="primary" />
+                            <p className="mt-2">Loading countries...</p>
+                          </div>
+                        ) : error.countries ? (
+                          <div className="text-center py-5">
+                            <i className="bi bi-exclamation-triangle text-danger display-1"></i>
+                            <p className="mt-3 mb-0">Error loading countries</p>
+                            <p className="text-muted">{error.countries}</p>
+                            <Button 
+                              variant="primary" 
+                              size="sm" 
+                              className="mt-2"
+                              onClick={fetchCountries}
+                            >
+                              <i className="bi bi-arrow-clockwise me-1"></i> Retry
+                            </Button>
+                          </div>
+                        ) : filteredCountries.length === 0 ? (
+                          <div className="text-center py-5">
+                            <i className="bi bi-search text-muted display-4"></i>
+                            <p className="mt-3">No countries match your search</p>
+                            <Button 
+                              variant="outline-secondary" 
+                              size="sm"
+                              onClick={() => setSearchTerm('')}
+                            >
+                              Clear search
+                            </Button>
+                          </div>
+                        ) : (
+                          <ListGroup variant="flush">
+                            {filteredCountries.map((country, index) => (
+                              <ListGroup.Item
+                                key={index}
+                                action
+                                active={selectedCountry === country}
+                                onClick={() => handleCountrySelect(country)}
+                                className="country-item"
+                              >
+                                <i className="bi bi-globe me-2"></i>
+                                {country}
+                              </ListGroup.Item>
+                            ))}
+                          </ListGroup>
+                        )}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                
+                <Col md={9} lg={9} xl={10}>
+                  <Card className="ndp-card">
+                    <Card.Header className="d-flex justify-content-between align-items-center">
+                      <h5 className="mb-0">
+                        {selectedCountry ? `Visa Types for ${selectedCountry}` : 'Select a Country'}
+                      </h5>
+                      <div>
+                        <Button 
+                          variant="primary" 
+                          onClick={handleAddVisa} 
+                          disabled={!selectedCountry || loading.operations}
+                          className="me-2"
+                        >
+                          <i className="bi bi-plus-lg me-1"></i> Add New Visa
+                        </Button>
+                        <Button 
+                          variant="outline-primary" 
+                          onClick={handleEditVisa} 
+                          disabled={!selectedVisa || loading.operations}
+                          className="me-2"
+                        >
+                          <i className="bi bi-pencil me-1"></i> Edit
+                        </Button>
+                        <Button 
+                          variant="outline-danger" 
+                          onClick={handleDeleteVisa} 
+                          disabled={!selectedVisa || loading.operations}
+                        >
+                          {loading.operations ? (
+                            <>
+                              <Spinner
+                                as="span"
+                                animation="border"
+                                size="sm"
+                                role="status"
+                                aria-hidden="true"
+                                className="me-1"
+                              />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <i className="bi bi-trash me-1"></i> Delete
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </Card.Header>
+                    <Card.Body>
+                      {!selectedCountry ? (
+                        <div className="text-center py-5">
+                          <i className="bi bi-arrow-left-circle text-muted display-1"></i>
+                          <p className="mt-3">Please select a country to view visa types</p>
+                        </div>
+                      ) : loading.visaTypes ? (
                         <div className="text-center py-5">
                           <Spinner animation="border" variant="primary" />
-                          <p className="mt-2">Loading countries...</p>
+                          <p className="mt-2">Loading visa types...</p>
                         </div>
-                      ) : error.countries ? (
+                      ) : error.visaTypes ? (
                         <div className="text-center py-5">
                           <i className="bi bi-exclamation-triangle text-danger display-1"></i>
-                          <p className="mt-3 mb-0">Error loading countries</p>
-                          <p className="text-muted">{error.countries}</p>
+                          <p className="mt-3 mb-0">Error loading visa types</p>
+                          <p className="text-muted">{error.visaTypes}</p>
                           <Button 
                             variant="primary" 
                             size="sm" 
                             className="mt-2"
-                            onClick={fetchCountries}
+                            onClick={() => fetchVisaTypes(selectedCountry)}
                           >
                             <i className="bi bi-arrow-clockwise me-1"></i> Retry
                           </Button>
                         </div>
-                      ) : filteredCountries.length === 0 ? (
-                        <div className="text-center py-5">
-                          <i className="bi bi-search text-muted display-4"></i>
-                          <p className="mt-3">No countries match your search</p>
-                          <Button 
-                            variant="outline-secondary" 
-                            size="sm"
-                            onClick={() => setSearchTerm('')}
-                          >
-                            Clear search
-                          </Button>
-                        </div>
                       ) : (
-                        <ListGroup variant="flush">
-                          {filteredCountries.map((country, index) => (
-                            <ListGroup.Item
-                              key={index}
-                              action
-                              active={selectedCountry === country}
-                              onClick={() => handleCountrySelect(country)}
-                              className="country-item"
-                            >
-                              <i className="bi bi-globe me-2"></i>
-                              {country}
-                            </ListGroup.Item>
-                          ))}
-                        </ListGroup>
-                      )}
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              
-              <Col md={9} lg={9} xl={10}>
-                <Card className="ndp-card">
-                  <Card.Header className="d-flex justify-content-between align-items-center">
-                    <h5 className="mb-0">
-                      {selectedCountry ? `Visa Types for ${selectedCountry}` : 'Select a Country'}
-                    </h5>
-                    <div>
-                      <Button 
-                        variant="primary" 
-                        onClick={handleAddVisa} 
-                        disabled={!selectedCountry || loading.operations}
-                        className="me-2"
-                      >
-                        <i className="bi bi-plus-lg me-1"></i> Add New Visa
-                      </Button>
-                      <Button 
-                        variant="outline-primary" 
-                        onClick={handleEditVisa} 
-                        disabled={!selectedVisa || loading.operations}
-                        className="me-2"
-                      >
-                        <i className="bi bi-pencil me-1"></i> Edit
-                      </Button>
-                      <Button 
-                        variant="outline-danger" 
-                        onClick={handleDeleteVisa} 
-                        disabled={!selectedVisa || loading.operations}
-                      >
-                        {loading.operations ? (
-                          <>
-                            <Spinner
-                              as="span"
-                              animation="border"
-                              size="sm"
-                              role="status"
-                              aria-hidden="true"
-                              className="me-1"
-                            />
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <i className="bi bi-trash me-1"></i> Delete
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </Card.Header>
-                  <Card.Body>
-                    {!selectedCountry ? (
-                      <div className="text-center py-5">
-                        <i className="bi bi-arrow-left-circle text-muted display-1"></i>
-                        <p className="mt-3">Please select a country to view visa types</p>
-                      </div>
-                    ) : loading.visaTypes ? (
-                      <div className="text-center py-5">
-                        <Spinner animation="border" variant="primary" />
-                        <p className="mt-2">Loading visa types...</p>
-                      </div>
-                    ) : error.visaTypes ? (
-                      <div className="text-center py-5">
-                        <i className="bi bi-exclamation-triangle text-danger display-1"></i>
-                        <p className="mt-3 mb-0">Error loading visa types</p>
-                        <p className="text-muted">{error.visaTypes}</p>
-                        <Button 
-                          variant="primary" 
-                          size="sm" 
-                          className="mt-2"
-                          onClick={() => fetchVisaTypes(selectedCountry)}
-                        >
-                          <i className="bi bi-arrow-clockwise me-1"></i> Retry
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="table-responsive">
-                        <Table hover className="visa-table">
-                          <thead>
-                            <tr>
-                              <th>Visa Type</th>
-                              <th>Description</th>
-                              <th>Eligible Applicants</th>
-                              <th>Duration</th>
-                              <th>Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {visaTypes.length > 0 ? (
-                              visaTypes.map((visa, index) => (
-                                <tr
-                                  key={index}
-                                  onClick={() => handleVisaSelect(visa.visa_type)}
-                                  className={selectedVisa === visa.visa_type ? 'selected-row' : ''}
-                                >
-                                  <td className="visa-type-cell">
-                                    <div className="d-flex align-items-center">
-                                      <i className="bi bi-file-earmark-text me-2 text-primary"></i>
-                                      <span className="fw-bold">{visa.visa_type}</span>
-                                    </div>
-                                  </td>
-                                  <td>{visa.description}</td>
-                                  <td>
-                                    {Array.isArray(visa.eligible_applicants) && 
-                                      visa.eligible_applicants.length > 0 ? (
-                                        visa.eligible_applicants.length > 1 ? 
-                                          `${visa.eligible_applicants[0]} +${visa.eligible_applicants.length - 1} more` :
-                                          visa.eligible_applicants[0]
-                                      ) : 'N/A'
-                                    }
-                                  </td>
-                                  <td>{visa.duration}</td>
-                                  <td>
-                                    {visa.exempted_countries && visa.exempted_countries.length > 0 ? (
-                                      <Badge bg="success" pill>
-                                        {visa.exempted_countries.length} exempted
-                                      </Badge>
-                                    ) : visa.restricted_countries && visa.restricted_countries.length > 0 ? (
-                                      <Badge bg="warning" text="dark" pill>
-                                        {visa.restricted_countries.length} restricted
-                                      </Badge>
-                                    ) : (
-                                      <Badge bg="info" pill>Standard</Badge>
-                                    )}
+                        <div className="table-responsive">
+                          <Table hover className="visa-table">
+                            <thead>
+                              <tr>
+                                <th>Visa Type</th>
+                                <th>Description</th>
+                                <th>Eligible Applicants</th>
+                                <th>Duration</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {visaTypes.length > 0 ? (
+                                visaTypes.map((visa, index) => (
+                                  <tr
+                                    key={index}
+                                    onClick={() => handleVisaSelect(visa.visa_type)}
+                                    className={selectedVisa === visa.visa_type ? 'selected-row' : ''}
+                                  >
+                                    <td className="visa-type-cell">
+                                      <div className="d-flex align-items-center">
+                                        <i className="bi bi-file-earmark-text me-2 text-primary"></i>
+                                        <span className="fw-bold">{visa.visa_type}</span>
+                                      </div>
+                                    </td>
+                                    <td>{visa.description}</td>
+                                    <td>
+                                      {Array.isArray(visa.eligible_applicants) && 
+                                        visa.eligible_applicants.length > 0 ? (
+                                          visa.eligible_applicants.length > 1 ? 
+                                            `${visa.eligible_applicants[0]} +${visa.eligible_applicants.length - 1} more` :
+                                            visa.eligible_applicants[0]
+                                        ) : 'N/A'
+                                      }
+                                    </td>
+                                    <td>{visa.duration}</td>
+                                    <td>
+                                      {visa.exempted_countries && visa.exempted_countries.length > 0 ? (
+                                        <Badge bg="success" pill>
+                                          {visa.exempted_countries.length} exempted
+                                        </Badge>
+                                      ) : visa.restricted_countries && visa.restricted_countries.length > 0 ? (
+                                        <Badge bg="warning" text="dark" pill>
+                                          {visa.restricted_countries.length} restricted
+                                        </Badge>
+                                      ) : (
+                                        <Badge bg="info" pill>Standard</Badge>
+                                      )}
+                                    </td>
+                                    <td>
+                                      <Button 
+                                        variant="outline-info" 
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Prevent row selection
+                                          // Navigate to experts for this visa type
+                                          setActiveTab('specialists');
+                                        }}
+                                      >
+                                        <i className="bi bi-people me-1"></i> Experts
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td colSpan="6" className="text-center py-4">
+                                    <i className="bi bi-exclamation-circle text-muted display-4"></i>
+                                    <p className="mt-3 mb-2">No visa types found for {selectedCountry}</p>
+                                    <Button 
+                                      variant="primary" 
+                                      size="sm"
+                                      onClick={handleAddVisa}
+                                    >
+                                      <i className="bi bi-plus-lg me-1"></i> Add New Visa
+                                    </Button>
                                   </td>
                                 </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan="5" className="text-center py-4">
-                                  <i className="bi bi-exclamation-circle text-muted display-4"></i>
-                                  <p className="mt-3 mb-2">No visa types found for {selectedCountry}</p>
-                                  <Button 
-                                    variant="primary" 
-                                    size="sm"
-                                    onClick={handleAddVisa}
-                                  >
-                                    <i className="bi bi-plus-lg me-1"></i> Add New Visa
-                                  </Button>
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </Table>
-                      </div>
-                    )}
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+                              )}
+                            </tbody>
+                          </Table>
+                        </div>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            ) : (
+              <SpecialistsManagement />
+            )}
           </Container>
         </div>
       </div>
